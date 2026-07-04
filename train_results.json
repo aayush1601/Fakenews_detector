@@ -1,0 +1,38 @@
+{
+  "NaiveBayes": {
+    "accuracy": 0.9591,
+    "f1": 0.959,
+    "precision": 0.959,
+    "recall": 0.9591,
+    "fake_accuracy": 0.9593,
+    "real_accuracy": 0.9589,
+    "file": "nb.pkl"
+  },
+  "LogReg": {
+    "accuracy": 0.9922,
+    "f1": 0.9922,
+    "precision": 0.9921,
+    "recall": 0.9922,
+    "fake_accuracy": 0.9913,
+    "real_accuracy": 0.9932,
+    "file": "lr.pkl"
+  },
+  "BiLSTM": {
+    "accuracy": 0.9971,
+    "f1": 0.9971,
+    "precision": 0.997,
+    "recall": 0.9972,
+    "fake_accuracy": 0.996,
+    "real_accuracy": 0.9984,
+    "file": "bilstm.pkl"
+  },
+  "BERT": {
+    "accuracy": 0.9962,
+    "f1": 0.9962,
+    "precision": 0.9961,
+    "recall": 0.9963,
+    "fake_accuracy": 0.9951,
+    "real_accuracy": 0.9974,
+    "file": "bert.pkl"
+  }
+}

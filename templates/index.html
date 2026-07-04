@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FakeNewsDB — DBMS + ML Web App</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">&#128445;</span>
+        <span class="logo-text">FakeNews<span class="accent">DB</span></span>
+      </div>
+      <p class="header-subtitle">
+        Oracle DBMS + Machine Learning &nbsp;&middot;&nbsp; SQL Explorer &amp; AI News Classifier
+      </p>
+      <div class="db-badge" id="db-badge" title="Database connection status">
+        <span class="badge-dot" id="badge-dot"></span>
+        <span class="badge-text" id="db-status-text">Connecting&hellip;</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="container">
+
+    <!-- STATS BAR -->
+    <div class="stats-bar">
+      <div class="stat-item">
+        <span class="stat-label">Oracle Tables</span>
+        <span class="stat-value" id="stat-tables">&#8212;</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-label">Total Records</span>
+        <span class="stat-value" id="stat-records">&#8212;</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-label">Last Query Rows</span>
+        <span class="stat-value" id="stat-rows">&#8212;</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-label">Models Loaded</span>
+        <span class="stat-value" id="stat-models">&#8212;</span>
+      </div>
+    </div>
+
+    <!-- ================================================
+         SECTION 1: SQL QUERY EXPLORER (Oracle)
+    ================================================ -->
+    <section class="card" id="sql-section">
+      <div class="card-header">
+        <h2 class="card-title">
+          <span class="title-icon">&#128269;</span> Oracle SQL Explorer
+        </h2>
+        <span class="card-badge">Live Oracle XE</span>
+      </div>
+
+      <!-- Quick query buttons -->
+      <div class="quick-btns">
+        <button class="qbtn" onclick="setQuery('SELECT * FROM isot_dataset FETCH FIRST 10 ROWS ONLY')">ISOT</button>
+        <button class="qbtn" onclick="setQuery('SELECT * FROM liar_dataset FETCH FIRST 10 ROWS ONLY')">LIAR</button>
+        <button class="qbtn" onclick="setQuery('SELECT * FROM fnn_pf_dataset FETCH FIRST 10 ROWS ONLY')">FNN-PF</button>
+        <button class="qbtn" onclick="setQuery('SELECT * FROM fnn_gc_dataset FETCH FIRST 10 ROWS ONLY')">FNN-GC</button>
+        <button class="qbtn" onclick="setQuery('SELECT * FROM model_results ORDER BY accuracy DESC FETCH FIRST 20 ROWS ONLY')">Results</button>
+        <button class="qbtn" onclick="setQuery('SELECT * FROM bias_scorecard ORDER BY disparity_score DESC')">Bias</button>
+        <button class="qbtn" onclick="setQuery('SELECT * FROM cross_dataset_performance ORDER BY accuracy DESC')">Cross-Dataset</button>
+        <button class="qbtn" onclick="setQuery('SELECT label, COUNT(*) AS cnt FROM isot_dataset GROUP BY label ORDER BY label')">Count by Label</button>
+        <button class="qbtn" onclick="setQuery('SELECT model_name, ROUND(AVG(accuracy),4) AS avg_acc, ROUND(AVG(f1_score),4) AS avg_f1 FROM model_results GROUP BY model_name ORDER BY avg_acc DESC')">Model Avg</button>
+      </div>
+
+      <!-- Table Schema Browser -->
+      <div class="table-browser">
+        <label class="field-label">Browse Table Schema</label>
+        <div class="browser-row">
+          <select id="schema-select" onchange="loadSchema(this.value)">
+            <option value="">-- select a table --</option>
+            <option value="isot_dataset">isot_dataset</option>
+            <option value="liar_dataset">liar_dataset</option>
+            <option value="fnn_pf_dataset">fnn_pf_dataset</option>
+            <option value="fnn_gc_dataset">fnn_gc_dataset</option>
+            <option value="experiments">experiments</option>
+            <option value="model_results">model_results</option>
+            <option value="bias_scorecard">bias_scorecard</option>
+            <option value="cross_dataset_performance">cross_dataset_performance</option>
+          </select>
+          <div id="schema-display" class="schema-pills"></div>
+        </div>
+      </div>
+
+      <!-- SQL textarea -->
+      <div class="field-group">
+        <label class="field-label" for="sql-input">
+          SQL Query
+          <span class="hint">Oracle syntax &mdash; use <code>FETCH FIRST n ROWS ONLY</code> (not LIMIT)</span>
+        </label>
+        <textarea id="sql-input" class="sql-textarea" rows="4"
+                  placeholder="SELECT * FROM isot_dataset FETCH FIRST 10 ROWS ONLY"
+                  spellcheck="false" oninput="updateSqlCount()"></textarea>
+        <div class="char-counter" id="sql-char-count">0 chars</div>
+      </div>
+
+      <!-- Options row -->
+      <div class="options-row">
+        <label class="field-label inline">
+          Row Limit &nbsp;
+          <select id="row-limit">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="250">250</option>
+            <option value="500">500</option>
+          </select>
+        </label>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="runQuery()">
+            &#9654; Run Query
+          </button>
+          <button class="btn btn-ghost" onclick="clearQuery()">Clear</button>
+          <button class="btn btn-ghost" onclick="exportCSV()" id="export-btn" disabled>Export CSV</button>
+        </div>
+      </div>
+
+      <!-- Status + results -->
+      <div id="query-status" class="status-bar hidden"></div>
+      <div id="query-results" class="results-wrapper hidden">
+        <div class="results-header">
+          <span id="results-title">Results</span>
+          <span class="results-count" id="results-count"></span>
+        </div>
+        <div class="table-scroll">
+          <table id="result-table" class="data-table">
+            <thead id="result-head"></thead>
+            <tbody id="result-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ================================================
+         SECTION 2: ML NEWS CLASSIFIER
+    ================================================ -->
+    <section class="card" id="predict-section">
+      <div class="card-header">
+        <h2 class="card-title">
+          <span class="title-icon">&#129302;</span> AI News Classifier
+        </h2>
+        <span class="card-badge">4 ML Models</span>
+      </div>
+
+      <!-- Sample buttons -->
+      <div class="quick-btns">
+        <button class="qbtn" onclick="setSample('real')">Sample Real</button>
+        <button class="qbtn" onclick="setSample('fake')">Sample Fake</button>
+        <button class="qbtn" onclick="setSample('political')">Political</button>
+        <button class="qbtn" onclick="setSample('health')">Health</button>
+      </div>
+
+      <div class="predict-grid">
+
+        <!-- Input column -->
+        <div class="predict-input-col">
+          <div class="field-group">
+            <label class="field-label" for="news-input">
+              News Text
+              <span class="hint">Paste a headline, article excerpt, or any news text</span>
+            </label>
+            <textarea id="news-input" class="news-textarea" rows="8"
+                      placeholder="Paste news headline or article text here&#8230;"
+                      oninput="updateCharCount()"></textarea>
+            <div class="char-counter" id="news-char-count">0 / 5000 chars</div>
+          </div>
+
+          <!-- Model selector pills -->
+          <div class="field-group">
+            <label class="field-label">Select Model</label>
+            <div class="model-pills" id="model-pills">
+              <button class="mpill active" data-model="NaiveBayes" onclick="selectModel(this)">
+                <span class="mpill-name">Naive Bayes</span>
+                <span class="mpill-sub">TF-IDF + MultinomialNB</span>
+              </button>
+              <button class="mpill" data-model="LogReg" onclick="selectModel(this)">
+                <span class="mpill-name">Logistic Reg</span>
+                <span class="mpill-sub">TF-IDF + LR</span>
+              </button>
+              <button class="mpill" data-model="BiLSTM" onclick="selectModel(this)">
+                <span class="mpill-name">BiLSTM</span>
+                <span class="mpill-sub">char n-gram SGD</span>
+              </button>
+              <button class="mpill" data-model="BERT" onclick="selectModel(this)">
+                <span class="mpill-name">BERT</span>
+                <span class="mpill-sub">SVC + rich n-grams</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="btn-group mt-sm">
+            <button class="btn btn-primary btn-large" onclick="predictNews()">
+              &#128300; Classify News
+            </button>
+            <button class="btn btn-ghost" onclick="clearPredict()">Clear</button>
+            <button class="btn btn-secondary" onclick="compareAllModels()">
+              Compare All Models
+            </button>
+          </div>
+        </div>
+
+        <!-- Output column -->
+        <div class="predict-output-col">
+          <div id="predict-placeholder" class="predict-placeholder">
+            <span class="placeholder-icon">&#128300;</span>
+            <p>Enter news text and click <strong>Classify News</strong> to see the prediction.</p>
+          </div>
+
+          <div id="predict-result" class="predict-result hidden">
+
+            <!-- Single prediction -->
+            <div id="single-result">
+              <div class="verdict-badge" id="verdict-badge">
+                <span class="verdict-label" id="verdict-label">FAKE</span>
+              </div>
+              <div class="confidence-section">
+                <div class="conf-header">
+                  <span class="conf-label">Confidence</span>
+                  <span class="conf-value" id="conf-value">&#8212;</span>
+                </div>
+                <div class="conf-bar-bg">
+                  <div class="conf-bar" id="conf-bar"></div>
+                </div>
+              </div>
+              <div class="result-meta">
+                <span class="meta-item">Model: <strong id="result-model">&#8212;</strong></span>
+              </div>
+            </div>
+
+            <!-- Multi-model comparison -->
+            <div id="compare-result" class="hidden">
+              <h3 class="compare-title">Model Comparison</h3>
+              <table class="compare-table">
+                <thead>
+                  <tr><th>Model</th><th>Prediction</th><th>Confidence</th></tr>
+                </thead>
+                <tbody id="compare-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="predict-status" class="status-bar hidden"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ================================================
+         SECTION 3: MODEL PERFORMANCE DASHBOARD
+    ================================================ -->
+    <section class="card" id="perf-section">
+      <div class="card-header">
+        <h2 class="card-title">
+          <span class="title-icon">&#128202;</span> Model Performance Dashboard
+        </h2>
+        <button class="btn btn-ghost btn-sm" onclick="loadPerformance()">Refresh</button>
+      </div>
+
+      <div id="perf-placeholder" class="predict-placeholder">
+        <span class="placeholder-icon">&#128202;</span>
+        <p>Click <strong>Refresh</strong> to load model performance data from Oracle.</p>
+      </div>
+
+      <div id="perf-content" class="hidden">
+        <div class="perf-grid" id="perf-grid"></div>
+      </div>
+    </section>
+
+    <!-- ================================================
+         SECTION 4: CUSTOM DATASET MANAGER (CRUD)
+    ================================================ -->
+    <section class="card" id="crud-section">
+      <div class="card-header">
+        <h2 class="card-title">
+          <span class="title-icon">&#128193;</span> Custom Dataset Manager
+        </h2>
+        <span class="card-badge">Full CRUD</span>
+      </div>
+      
+      <div class="crud-form">
+        <input type="hidden" id="crud-id" value="">
+        <div class="field-group">
+          <label class="field-label" for="crud-title">Title</label>
+          <input type="text" id="crud-title" class="news-textarea" style="height:40px; padding:8px 12px;" placeholder="News Title">
+        </div>
+        
+        <div class="options-row" style="margin-bottom: 1rem; align-items: flex-end;">
+          <div class="field-group" style="flex: 2; margin-bottom: 0;">
+            <label class="field-label" for="crud-subject">Subject</label>
+            <input type="text" id="crud-subject" class="news-textarea" style="height:40px; padding:8px 12px;" placeholder="e.g. politics, health">
+          </div>
+          &nbsp;&nbsp;
+          <div class="field-group" style="flex: 1; margin-bottom: 0;">
+            <label class="field-label" for="crud-label">Label</label>
+            <select id="crud-label" style="height:40px; width:100%; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:0 12px;">
+              <option value="FAKE">FAKE</option>
+              <option value="REAL">REAL</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="crud-text">Content</label>
+          <textarea id="crud-text" class="news-textarea" rows="4" placeholder="News Content..."></textarea>
+        </div>
+        
+        <div class="btn-group mt-sm">
+          <button class="btn btn-primary" onclick="saveCustomNews()">Save Record</button>
+          <button class="btn btn-ghost" onclick="clearCrudForm()">Clear Form</button>
+        </div>
+        <div id="crud-status" class="status-bar hidden mt-sm" style="margin-top: 10px;"></div>
+      </div>
+
+      <div style="margin-top: 2rem;">
+        <div class="results-header" style="justify-content: space-between; display: flex; align-items: center; margin-bottom: 10px;">
+          <span id="results-title" style="font-weight: 600;">Custom Records</span>
+          <button class="btn btn-ghost btn-sm" onclick="fetchCustomNews()">Refresh</button>
+        </div>
+        <div class="table-scroll" style="max-height: 400px; border: 1px solid var(--border); border-radius: 6px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:50px">ID</th>
+                <th>Title</th>
+                <th>Subject</th>
+                <th style="width:80px">Label</th>
+                <th style="width:170px">Created</th>
+                <th style="width:120px; text-align:center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="crud-table-body">
+              <tr><td colspan="6" style="text-align:center; padding: 2rem; color:var(--text2)">Click Refresh to load...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p>FakeNewsDB &nbsp;&middot;&nbsp; Oracle XE &nbsp;+&nbsp; Flask &nbsp;+&nbsp; scikit-learn
+       &nbsp;&middot;&nbsp; Datasets: ISOT &middot; LIAR &middot; FakeNewsNet</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
