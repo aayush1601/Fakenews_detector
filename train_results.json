@@ -18,12 +18,12 @@
     "file": "lr.pkl"
   },
   "BiLSTM": {
-    "accuracy": 0.9971,
-    "f1": 0.9971,
-    "precision": 0.997,
-    "recall": 0.9972,
+    "accuracy": 0.9972,
+    "f1": 0.9972,
+    "precision": 0.9971,
+    "recall": 0.9973,
     "fake_accuracy": 0.996,
-    "real_accuracy": 0.9984,
+    "real_accuracy": 0.9986,
     "file": "bilstm.pkl"
   },
   "BERT": {
